@@ -22,7 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await ApiService.login(_emailController.text, _passwordController.text);
+      final result = await ApiService.login(_emailController.text, _passwordController.text);
+      await ApiService.saveUserInfo(result);
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
       if (mounted) {

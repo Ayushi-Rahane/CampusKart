@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Item = require('../models/Item');
+const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const { upload } = require('../config/cloudinary');
 
@@ -36,6 +37,20 @@ router.get('/my', protect, async (req, res) => {
   try {
     const items = await Item.find({ sellerId: req.sellerId }).sort({ createdAt: -1 });
     res.json(items);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/items/:id - Get single item with seller info
+router.get('/:id', protect, async (req, res) => {
+  try {
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: 'Item not found' });
+    const seller = await User.findById(item.sellerId).select('name email');
+    const itemObj = item.toObject();
+    itemObj.seller = seller ? { name: seller.name, email: seller.email } : null;
+    res.json(itemObj);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

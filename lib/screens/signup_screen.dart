@@ -23,7 +23,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await ApiService.register(_nameController.text, _emailController.text, _passwordController.text);
+      final result = await ApiService.register(_nameController.text, _emailController.text, _passwordController.text);
+      await ApiService.saveUserInfo(result);
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
       if (mounted) {

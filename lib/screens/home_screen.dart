@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_service.dart';
+import 'item_detail_screen.dart';
+import 'wishlist_screen.dart';
+import 'conversations_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -77,24 +80,33 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 30),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Location', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: AppTheme.accentYellow),
-                          const SizedBox(width: 4),
-                          const Text('Block B, Campus', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
-                          const SizedBox(width: 5),
-                          Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.white.withOpacity(0.8)),
-                        ],
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Location', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 16, color: AppTheme.accentYellow),
+                            const SizedBox(width: 4),
+                            const Flexible(
+                              child: Text(
+                                'Block B, Campus', 
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.white.withOpacity(0.8)),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 10),
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
@@ -126,7 +138,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           SizedBox(width: 15),
                           Icon(Icons.search, color: Colors.grey),
                           SizedBox(width: 10),
-                          Text('Search items...', style: TextStyle(color: Colors.grey)),
+                          Expanded(
+                            child: Text(
+                              'Search items...', 
+                              style: TextStyle(color: Colors.grey),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -189,7 +207,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       itemCount: filteredItems.length,
                       itemBuilder: (context, index) {
-                        return _buildItemCard(filteredItems[index]);
+                        return GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ItemDetailScreen(itemId: filteredItems[index]['_id']),
+                              ),
+                            );
+                            _fetchItems(); // Refresh on return
+                          },
+                          child: _buildItemCard(filteredItems[index]),
+                        );
                       },
                     ),
             ),
@@ -206,11 +235,23 @@ class _HomeScreenState extends State<HomeScreen> {
           if (index == 1) {
             await Navigator.pushNamed(context, '/add-item');
             _fetchItems(); // Refresh items when coming back
+          } else if (index == 2) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const WishlistScreen()),
+            );
+            _fetchItems(); // Refresh on return
+          } else if (index == 3) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ConversationsScreen()),
+            );
           }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.add_box_outlined), label: 'Sell'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: 'Wishlist'),
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
