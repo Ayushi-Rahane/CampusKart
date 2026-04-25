@@ -300,5 +300,154 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('userId');
   }
+
+  static Future<void> markAsRead(String conversationId) async {
+    final token = await getToken();
+    if (token == null) return;
+
+    await http.patch(
+      Uri.parse('$baseUrl/chat/$conversationId/read'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+  }
+
+  static Future<int> getUnreadTotal() async {
+    final token = await getToken();
+    if (token == null) return 0;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/chat/unread-total'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['unreadCount'] ?? 0;
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  // ---- Profile & Order APIs ----
+
+  static Future<Map<String, dynamic>> getUserProfile() async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/profile'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to load profile');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateProfile(String name, String phone, String address) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/users/profile'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'name': name, 'phone': phone, 'address': address}),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to update profile');
+    }
+  }
+
+  static Future<void> changePassword(String currentPassword, String newPassword) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/users/password'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'currentPassword': currentPassword, 'newPassword': newPassword}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to change password');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getSellerProfile(String sellerId) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/$sellerId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to load seller profile');
+    }
+  }
+
+  static Future<void> rateSeller(String sellerId, String itemId, int rating, String feedback) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/users/$sellerId/rate'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'itemId': itemId, 'rating': rating, 'feedback': feedback}),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to submit rating');
+    }
+  }
+
+  static Future<Map<String, dynamic>> buyItem(String itemId) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/items/$itemId/buy'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to buy item');
+    }
+  }
 }
+
 

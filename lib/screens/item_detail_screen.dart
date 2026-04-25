@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_service.dart';
 import 'chat_screen.dart';
+import 'seller_profile_screen.dart';
 
 class ItemDetailScreen extends StatefulWidget {
   final String itemId;
@@ -16,6 +17,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   bool _isLoading = true;
   bool _isWishlisted = false;
   bool _wishlistLoading = false;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -24,6 +26,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   Future<void> _loadItem() async {
+    _currentUserId = await ApiService.getSavedUserId();
     try {
       final item = await ApiService.getItemDetail(widget.itemId);
       final wishlisted = await ApiService.checkWishlist(widget.itemId);
@@ -291,51 +294,58 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                         // Seller Card
                         if (seller != null)
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8F9FA),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.grey.withOpacity(0.12)),
-                            ),
-                            child: Row(
-                              children: [
-                                // Seller avatar
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: AppTheme.headerTeal.withOpacity(0.5),
-                                  child: Text(
-                                    (seller['name'] ?? 'S')[0].toUpperCase(),
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFF2D3142)),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (ctx) => SellerProfileScreen(sellerId: item['sellerId'])),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8F9FA),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Seller avatar
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: AppTheme.headerTeal.withOpacity(0.5),
+                                    child: Text(
+                                      (seller['name'] ?? 'S')[0].toUpperCase(),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFF2D3142)),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        seller['name'] ?? 'Seller',
-                                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        seller['email'] ?? '',
-                                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          seller['name'] ?? 'Seller',
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          'Tap to view profile & ratings',
+                                          style: TextStyle(fontSize: 12, color: AppTheme.primaryPink, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.headerTeal.withOpacity(0.3),
-                                    shape: BoxShape.circle,
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.headerTeal.withOpacity(0.3),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.chevron_right, color: AppTheme.headerTeal, size: 20),
                                   ),
-                                  child: const Icon(Icons.verified, color: AppTheme.headerTeal, size: 20),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
 
@@ -348,37 +358,71 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             ),
           ),
 
-          // Bottom Contact Seller button
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -4)),
-              ],
-            ),
-            child: SafeArea(
-              top: false,
-              child: ElevatedButton(
-                onPressed: _contactSeller,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryPink,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 56),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          // Bottom Action Buttons
+          if (item['status'] == 'sold')
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              color: Colors.grey[200],
+              child: SafeArea(top: false, child: const Center(child: Text('This item has been sold', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 16)))),
+            )
+          else if (_currentUserId != null && item['sellerId'] != _currentUserId)
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -4)),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
                   children: [
-                    Icon(Icons.chat_bubble_outline, size: 20),
-                    SizedBox(width: 10),
-                    Text('Contact Seller', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    Expanded(
+                      flex: 1,
+                      child: OutlinedButton(
+                        onPressed: _contactSeller,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primaryPink,
+                          side: const BorderSide(color: AppTheme.primaryPink, width: 2),
+                          minimumSize: const Size(double.infinity, 56),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Icon(Icons.chat_bubble_outline, size: 24),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          try {
+                            await ApiService.buyItem(widget.itemId);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item purchased successfully!')));
+                              _loadItem(); // Reload to show sold status
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red));
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryPink,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 56),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
+                        ),
+                        child: const Text('Buy Now', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

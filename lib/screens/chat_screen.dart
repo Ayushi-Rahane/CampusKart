@@ -39,6 +39,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _init() async {
     _currentUserId = await ApiService.getUserId();
     await _loadMessages();
+    // Mark messages as read when opening the chat
+    await ApiService.markAsRead(widget.conversationId);
     // Poll for new messages every 3 seconds
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       _loadMessages(silent: true);
@@ -57,14 +59,16 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final messages = await ApiService.getMessages(widget.conversationId);
       if (mounted) {
-        final hadMessages = _messages.length;
+        final hadCount = _messages.length;
         setState(() {
           _messages = messages;
           _isLoading = false;
         });
-        // Auto-scroll to bottom when new messages arrive
-        if (messages.length > hadMessages) {
+        // Auto-scroll when new messages arrive
+        if (messages.length > hadCount) {
           _scrollToBottom();
+          // Mark incoming messages as read
+          ApiService.markAsRead(widget.conversationId);
         }
       }
     } catch (e) {
@@ -102,7 +106,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     } catch (e) {
       if (mounted) {
-        _messageController.text = text; // Restore text on failure
+        _messageController.text = text;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send: ${e.toString().replaceAll("Exception: ", "")}'), backgroundColor: Colors.red),
         );
@@ -127,6 +131,37 @@ class _ChatScreenState extends State<ChatScreen> {
       return 'Yesterday $time';
     } else {
       return '${date.day}/${date.month} $time';
+    }
+  }
+
+  Widget _buildStatusIcon(String? status, bool isMe) {
+    if (!isMe) return const SizedBox.shrink();
+
+    switch (status) {
+      case 'read':
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            SizedBox(width: 4),
+            Icon(Icons.done_all, size: 14, color: Colors.lightBlueAccent),
+          ],
+        );
+      case 'delivered':
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 4),
+            Icon(Icons.done_all, size: 14, color: Colors.white.withOpacity(0.7)),
+          ],
+        );
+      default: // 'sent'
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 4),
+            Icon(Icons.done, size: 14, color: Colors.white.withOpacity(0.7)),
+          ],
+        );
     }
   }
 
@@ -340,12 +375,18 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    _formatTime(msg['createdAt']),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isMe ? Colors.white.withOpacity(0.7) : Colors.grey[400],
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _formatTime(msg['createdAt']),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isMe ? Colors.white.withOpacity(0.7) : Colors.grey[400],
+                        ),
+                      ),
+                      _buildStatusIcon(msg['status'], isMe),
+                    ],
                   ),
                 ],
               ),

@@ -14,6 +14,11 @@ const itemSchema = new mongoose.Schema({
     ref: 'User', 
     required: true 
   },
+  buyerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   status: { 
     type: String, 
     enum: ['available', 'sold'], 

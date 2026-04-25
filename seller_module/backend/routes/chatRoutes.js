@@ -10,7 +10,7 @@ const { protect } = require('../middleware/auth');
 router.post('/start', protect, async (req, res) => {
   try {
     const { sellerId, itemId } = req.body;
-    const buyerId = req.sellerId; // current logged-in user (named sellerId in auth middleware)
+    const buyerId = req.sellerId; // current logged-in user
 
     if (buyerId === sellerId) {
       return res.status(400).json({ message: "You can't chat with yourself" });
@@ -43,12 +43,18 @@ router.get('/conversations', protect, async (req, res) => {
       participants: userId,
     }).sort({ updatedAt: -1 });
 
-    // Populate with other user's info and item info
     const result = [];
     for (const conv of conversations) {
       const otherUserId = conv.participants.find(p => p.toString() !== userId);
       const otherUser = await User.findById(otherUserId).select('name email');
       const item = await Item.findById(conv.itemId).select('title imageUrl price');
+
+      // Count unread messages (messages not sent by me that are not 'read')
+      const unreadCount = await Message.countDocuments({
+        conversationId: conv._id,
+        senderId: { $ne: userId },
+        status: { $ne: 'read' },
+      });
 
       result.push({
         _id: conv._id,
@@ -56,10 +62,30 @@ router.get('/conversations', protect, async (req, res) => {
         item: item ? { _id: item._id, title: item.title, imageUrl: item.imageUrl, price: item.price } : null,
         lastMessage: conv.lastMessage,
         updatedAt: conv.updatedAt,
+        unreadCount: unreadCount,
       });
     }
 
     res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/chat/unread-total - Get total unread message count for the user
+router.get('/unread-total', protect, async (req, res) => {
+  try {
+    const userId = req.sellerId;
+    const conversations = await Conversation.find({ participants: userId });
+    const convIds = conversations.map(c => c._id);
+
+    const unreadCount = await Message.countDocuments({
+      conversationId: { $in: convIds },
+      senderId: { $ne: userId },
+      status: { $ne: 'read' },
+    });
+
+    res.json({ unreadCount });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -75,13 +101,22 @@ router.get('/:conversationId/messages', protect, async (req, res) => {
       return res.status(404).json({ message: 'Conversation not found' });
     }
 
-    // Ensure user is a participant
     if (!conversation.participants.map(p => p.toString()).includes(userId)) {
       return res.status(403).json({ message: 'Not authorized to view this conversation' });
     }
 
     const messages = await Message.find({ conversationId: req.params.conversationId })
       .sort({ createdAt: 1 });
+
+    // Mark messages from other user as 'delivered' if they were 'sent'
+    await Message.updateMany(
+      {
+        conversationId: req.params.conversationId,
+        senderId: { $ne: userId },
+        status: 'sent',
+      },
+      { $set: { status: 'delivered' } }
+    );
 
     res.json(messages);
   } catch (error) {
@@ -112,9 +147,9 @@ router.post('/:conversationId/messages', protect, async (req, res) => {
       conversationId: req.params.conversationId,
       senderId: userId,
       text: text.trim(),
+      status: 'sent',
     });
 
-    // Update conversation's last message and timestamp
     conversation.lastMessage = text.trim();
     conversation.updatedAt = new Date();
     await conversation.save();
@@ -125,7 +160,37 @@ router.post('/:conversationId/messages', protect, async (req, res) => {
   }
 });
 
-// GET /api/chat/:conversationId/info - Get conversation info (other user + item)
+// PATCH /api/chat/:conversationId/read - Mark all messages from other user as read
+router.patch('/:conversationId/read', protect, async (req, res) => {
+  try {
+    const userId = req.sellerId;
+    const conversation = await Conversation.findById(req.params.conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    if (!conversation.participants.map(p => p.toString()).includes(userId)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Mark all messages from the OTHER user as 'read'
+    const result = await Message.updateMany(
+      {
+        conversationId: req.params.conversationId,
+        senderId: { $ne: userId },
+        status: { $ne: 'read' },
+      },
+      { $set: { status: 'read' } }
+    );
+
+    res.json({ marked: result.modifiedCount });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/chat/:conversationId/info - Get conversation info
 router.get('/:conversationId/info', protect, async (req, res) => {
   try {
     const userId = req.sellerId;

@@ -79,18 +79,6 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 children: [
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
                       const Expanded(
                         child: Text(
                           'Messages',
@@ -229,35 +217,56 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   const SizedBox(height: 3),
                   Text(
                     lastMsg.isNotEmpty ? lastMsg : 'No messages yet',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                    style: TextStyle(
+                      fontSize: 13, 
+                      color: (conv['unreadCount'] ?? 0) > 0 ? AppTheme.headerTeal : Colors.grey[500],
+                      fontWeight: (conv['unreadCount'] ?? 0) > 0 ? FontWeight.bold : FontWeight.normal,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            // Item thumbnail
-            if (itemImage != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 10),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    itemImage,
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                    errorBuilder: (ctx, err, stack) => Container(
-                      width: 48, height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(10),
+            // Unread badge and Item thumbnail
+            Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Row(
+                children: [
+                  if ((conv['unreadCount'] ?? 0) > 0)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primaryPink,
+                        shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                      child: Text(
+                        conv['unreadCount'].toString(),
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ),
-                ),
+                  if (itemImage != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        itemImage,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Container(
+                          width: 48, height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
       ),

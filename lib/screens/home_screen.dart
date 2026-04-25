@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_service.dart';
 import 'item_detail_screen.dart';
 import 'wishlist_screen.dart';
 import 'conversations_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,11 +18,52 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _items = [];
   bool _isLoading = true;
   String _selectedCategory = 'All';
+  int _unreadCount = 0;
+  Timer? _pollingTimer;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _fetchItems();
+    _fetchUnreadCount();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchUnreadCount());
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    try {
+      final count = await ApiService.getUnreadTotal();
+      if (mounted && count != _unreadCount) {
+        if (count > _unreadCount && _unreadCount > 0) {
+          // New message arrived!
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('🔔 You have a new message!'),
+              backgroundColor: AppTheme.headerTeal,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              action: SnackBarAction(
+                label: 'View',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ConversationsScreen()),
+                  );
+                },
+              ),
+            ),
+          );
+        }
+        setState(() => _unreadCount = count);
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchItems() async {
@@ -47,9 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Filter items based on category
+  Widget _buildHomeBody() {
     final filteredItems = _selectedCategory == 'All' 
         ? _items 
         : _selectedCategory == 'Others'
@@ -59,12 +100,10 @@ class _HomeScreenState extends State<HomeScreen> {
               }).toList()
             : _items.where((item) => item['category'] == _selectedCategory).toList();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Slightly off-white backgorund
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             // Colored Header
             Container(
               decoration: const BoxDecoration(
@@ -224,9 +263,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: IndexedStack(
+        index: _selectedIndex == 1 ? 0 : _selectedIndex,
+        children: [
+          _buildHomeBody(),
+          const SizedBox(), // Index 1 is Add Item (pushed)
+          WishlistScreen(),
+          const ConversationsScreen(),
+          const ProfileScreen(),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex == 1 ? 0 : _selectedIndex, // keep highlight on previous tab if 1 is tapped
         selectedItemColor: AppTheme.primaryPink,
         unselectedItemColor: Colors.grey,
         selectedFontSize: 12,
@@ -235,25 +291,43 @@ class _HomeScreenState extends State<HomeScreen> {
           if (index == 1) {
             await Navigator.pushNamed(context, '/add-item');
             _fetchItems(); // Refresh items when coming back
-          } else if (index == 2) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const WishlistScreen()),
-            );
-            _fetchItems(); // Refresh on return
-          } else if (index == 3) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ConversationsScreen()),
-            );
+          } else {
+            setState(() {
+              _selectedIndex = index;
+            });
+            if (index == 0) _fetchItems();
           }
         },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.add_box_outlined), label: 'Sell'),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: 'Wishlist'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
+          const BottomNavigationBarItem(icon: Icon(Icons.add_box_outlined), label: 'Sell'),
+          const BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: 'Wishlist'),
+          BottomNavigationBarItem(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.chat_bubble_outline),
+                if (_unreadCount > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primaryPink,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        _unreadCount > 9 ? '9+' : _unreadCount.toString(),
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            label: 'Chat',
+          ),
+          const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
     );

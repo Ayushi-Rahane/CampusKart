@@ -80,7 +80,7 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
-// PATCH /api/items/:id/sold
+// PATCH /api/items/:id/sold - Seller manually marks as sold
 router.patch('/:id/sold', protect, async (req, res) => {
   try {
     const item = await Item.findOneAndUpdate(
@@ -89,6 +89,29 @@ router.patch('/:id/sold', protect, async (req, res) => {
       { new: true }
     );
     res.json(item);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/items/:id/buy - Buyer purchases an item
+router.post('/:id/buy', protect, async (req, res) => {
+  try {
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: 'Item not found' });
+    
+    if (item.sellerId.toString() === req.sellerId) {
+      return res.status(400).json({ message: "You cannot buy your own item" });
+    }
+    if (item.status === 'sold') {
+      return res.status(400).json({ message: "Item is already sold" });
+    }
+
+    item.status = 'sold';
+    item.buyerId = req.sellerId;
+    await item.save();
+
+    res.json({ message: 'Purchase successful!', item });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

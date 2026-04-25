@@ -88,18 +88,6 @@ class _WishlistScreenState extends State<WishlistScreen> {
                 children: [
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
                       const Expanded(
                         child: Text(
                           'My Wishlist',
