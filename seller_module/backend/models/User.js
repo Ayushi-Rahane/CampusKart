@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
     itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
     rating: { type: Number, required: true, min: 1, max: 5 },
     feedback: { type: String, default: '' },
+    imageUrl: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now }
   }],
 }, { timestamps: true });

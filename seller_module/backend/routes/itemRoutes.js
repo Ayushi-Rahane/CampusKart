@@ -35,7 +35,7 @@ router.get('/', protect, async (req, res) => {
 // GET /api/items/my - Get seller's items
 router.get('/my', protect, async (req, res) => {
   try {
-    const items = await Item.find({ sellerId: req.sellerId }).sort({ createdAt: -1 });
+    const items = await Item.find({ sellerId: req.sellerId }).populate('requests', 'name email').sort({ createdAt: -1 });
     res.json(items);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -45,7 +45,7 @@ router.get('/my', protect, async (req, res) => {
 // GET /api/items/:id - Get single item with seller info
 router.get('/:id', protect, async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    const item = await Item.findById(req.params.id).populate('requests', 'name email');
     if (!item) return res.status(404).json({ message: 'Item not found' });
     const seller = await User.findById(item.sellerId).select('name email');
     const itemObj = item.toObject();
@@ -94,24 +94,47 @@ router.patch('/:id/sold', protect, async (req, res) => {
   }
 });
 
-// POST /api/items/:id/buy - Buyer purchases an item
-router.post('/:id/buy', protect, async (req, res) => {
+// POST /api/items/:id/request - Buyer requests to purchase an item
+router.post('/:id/request', protect, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ message: 'Item not found' });
     
     if (item.sellerId.toString() === req.sellerId) {
-      return res.status(400).json({ message: "You cannot buy your own item" });
+      return res.status(400).json({ message: "You cannot request your own item" });
     }
     if (item.status === 'sold') {
       return res.status(400).json({ message: "Item is already sold" });
     }
+    if (item.requests.includes(req.sellerId)) {
+      return res.status(400).json({ message: "You have already requested to buy this item" });
+    }
 
-    item.status = 'sold';
-    item.buyerId = req.sellerId;
+    item.requests.push(req.sellerId);
     await item.save();
 
-    res.json({ message: 'Purchase successful!', item });
+    res.json({ message: 'Request sent to seller successfully!', item });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/items/:id/approve/:buyerId - Seller approves a buyer's request
+router.post('/:id/approve/:buyerId', protect, async (req, res) => {
+  try {
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: 'Item not found' });
+
+    if (item.sellerId.toString() !== req.sellerId) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+    
+    item.status = 'sold';
+    item.buyerId = req.params.buyerId;
+    item.requests = []; // Clear other requests
+    await item.save();
+
+    res.json({ message: 'Purchase approved!', item });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

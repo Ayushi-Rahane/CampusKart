@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../theme.dart';
 import '../services/api_service.dart';
 import 'item_detail_screen.dart';
@@ -259,8 +260,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildItemList(_purchases, emptyText: 'No purchases yet'),
-                  _buildItemList(_sales, emptyText: 'No items sold yet'),
+                  _buildItemList(_purchases, emptyText: 'No purchases yet', isPurchase: true),
+                  _buildItemList(_sales, emptyText: 'No items sold yet', isSale: true),
                 ],
               ),
             ),
@@ -270,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildItemList(List<dynamic> items, {required String emptyText}) {
+  Widget _buildItemList(List<dynamic> items, {required String emptyText, bool isSale = false, bool isPurchase = false}) {
     if (items.isEmpty) {
       return Center(child: Text(emptyText, style: const TextStyle(color: Colors.grey)));
     }
@@ -288,13 +289,143 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               : const Icon(Icons.image, size: 50),
             title: Text(item['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('₹${item['price']} • ${item['category']}'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (ctx) => ItemDetailScreen(itemId: item['_id'])));
+            trailing: isSale
+                ? IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _confirmDelete(item['_id']),
+                  )
+                : (isPurchase
+                    ? IconButton(
+                        icon: const Icon(Icons.rate_review, color: Colors.green),
+                        onPressed: () => _showRateDialog(item['sellerId'], item['_id']),
+                      )
+                    : const Icon(Icons.chevron_right)),
+            onTap: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (ctx) => ItemDetailScreen(itemId: item['_id'])));
+              _loadProfile();
             },
           ),
         );
       },
+    );
+  }
+
+  void _confirmDelete(String itemId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Item'),
+        content: const Text('Are you sure you want to delete this item?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiService.deleteItem(itemId);
+                _loadProfile();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item deleted successfully')));
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRateDialog(String sellerId, String itemId) {
+    double rating = 5.0;
+    final feedbackCtrl = TextEditingController();
+    XFile? pickedImage;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateSB) {
+          return AlertDialog(
+            title: const Text('Rate Purchase'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('How was your experience?'),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: AppTheme.accentYellow,
+                          size: 32,
+                        ),
+                        onPressed: () {
+                          setStateSB(() => rating = index + 1.0);
+                        },
+                      );
+                    }),
+                  ),
+                  TextField(
+                    controller: feedbackCtrl,
+                    decoration: const InputDecoration(labelText: 'Feedback (Optional)'),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 15),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final ImagePicker picker = ImagePicker();
+                      final img = await picker.pickImage(source: ImageSource.gallery);
+                      if (img != null) {
+                        setStateSB(() => pickedImage = img);
+                      }
+                    },
+                    icon: const Icon(Icons.image),
+                    label: Text(pickedImage == null ? 'Attach Picture' : 'Picture Selected'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    List<int>? bytes;
+                    String? filename;
+                    if (pickedImage != null) {
+                      bytes = await pickedImage!.readAsBytes();
+                      filename = pickedImage!.name;
+                    }
+                    
+                    await ApiService.rateSeller(
+                      sellerId, 
+                      itemId, 
+                      rating.toInt(), 
+                      feedbackCtrl.text, 
+                      imageBytes: bytes, 
+                      imageFileName: filename,
+                    );
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rating submitted successfully!')));
+                      _loadProfile();
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))));
+                    }
+                  }
+                },
+                child: const Text('Submit'),
+              ),
+            ],
+          );
+        }
+      ),
     );
   }
 }

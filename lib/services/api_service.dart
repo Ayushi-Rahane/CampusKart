@@ -94,6 +94,23 @@ class ApiService {
     }
   }
 
+  static Future<void> deleteItem(String itemId) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/items/$itemId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to delete item');
+    }
+  }
+
   static Future<void> addToWishlist(String itemId) async {
     final token = await getToken();
     if (token == null) throw Exception('Not authenticated');
@@ -412,30 +429,37 @@ class ApiService {
     }
   }
 
-  static Future<void> rateSeller(String sellerId, String itemId, int rating, String feedback) async {
+  static Future<void> rateSeller(String sellerId, String itemId, int rating, String feedback, {List<int>? imageBytes, String? imageFileName}) async {
     final token = await getToken();
     if (token == null) throw Exception('Not authenticated');
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/users/$sellerId/rate'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'itemId': itemId, 'rating': rating, 'feedback': feedback}),
-    );
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/users/$sellerId/rate'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields['itemId'] = itemId;
+    request.fields['rating'] = rating.toString();
+    request.fields['feedback'] = feedback;
 
+    if (imageBytes != null && imageBytes.isNotEmpty && imageFileName != null) {
+      request.files.add(http.MultipartFile.fromBytes('image', imageBytes, filename: imageFileName));
+    }
+
+    final response = await request.send();
     if (response.statusCode != 201) {
-      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to submit rating');
+      final resBody = await response.stream.bytesToString();
+      try {
+        throw Exception(jsonDecode(resBody)['message'] ?? 'Failed to submit rating');
+      } catch (_) {
+        throw Exception('Failed to submit rating');
+      }
     }
   }
 
-  static Future<Map<String, dynamic>> buyItem(String itemId) async {
+  static Future<Map<String, dynamic>> requestItem(String itemId) async {
     final token = await getToken();
     if (token == null) throw Exception('Not authenticated');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/items/$itemId/buy'),
+      Uri.parse('$baseUrl/items/$itemId/request'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -445,7 +469,26 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to buy item');
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to request item');
+    }
+  }
+
+  static Future<Map<String, dynamic>> approveRequest(String itemId, String buyerId) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/items/$itemId/approve/$buyerId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to approve request');
     }
   }
 }

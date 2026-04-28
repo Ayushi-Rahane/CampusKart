@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Item = require('../models/Item');
 const { protect } = require('../middleware/auth');
+const { upload } = require('../config/cloudinary');
 
 // GET /api/users/profile - Get logged-in user profile with stats
 router.get('/profile', protect, async (req, res) => {
@@ -92,7 +93,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // POST /api/users/:id/rate - Rate a seller
-router.post('/:id/rate', protect, async (req, res) => {
+router.post('/:id/rate', protect, upload.single('image'), async (req, res) => {
   try {
     const { rating, feedback, itemId } = req.body;
     const sellerId = req.params.id;
@@ -115,7 +116,8 @@ router.post('/:id/rate', protect, async (req, res) => {
       buyerId,
       itemId,
       rating,
-      feedback
+      feedback,
+      imageUrl: req.file ? req.file.path : ''
     });
 
     await seller.save();

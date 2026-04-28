@@ -150,6 +150,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
     final item = _item!;
     final seller = item['seller'];
+    final requests = item['requests'] as List<dynamic>? ?? [];
+    final hasRequested = requests.any((r) {
+      if (r is Map) return r['_id'] == _currentUserId;
+      return r.toString() == _currentUserId;
+    });
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -195,6 +200,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             ),
                             Row(
                               children: [
+                                if (_currentUserId != null && item['sellerId'] == _currentUserId) ...[
+                                  _buildCircleButton(
+                                    icon: Icons.delete_outline,
+                                    iconColor: Colors.red,
+                                    onTap: _confirmDelete,
+                                  ),
+                                  const SizedBox(width: 10),
+                                ],
                                 _buildCircleButton(icon: Icons.share_outlined, onTap: () {}),
                                 const SizedBox(width: 10),
                                 _buildCircleButton(
@@ -366,6 +379,112 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               color: Colors.grey[200],
               child: SafeArea(top: false, child: const Center(child: Text('This item has been sold', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 16)))),
             )
+          else if (_currentUserId != null && item['sellerId'] == _currentUserId && requests.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -4))],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.hourglass_empty_rounded, size: 36, color: Colors.grey[400]),
+                    const SizedBox(height: 8),
+                    Text('No purchase requests yet', style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w600, fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Text('Buyers will appear here once they request to buy this item.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                  ],
+                ),
+              ),
+            )
+          else if (_currentUserId != null && item['sellerId'] == _currentUserId && requests.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              constraints: const BoxConstraints(maxHeight: 300),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -4)),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Purchase Requests (${requests.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 10),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: requests.map<Widget>((req) {
+                            final reqId = req is Map ? req['_id'] : req.toString();
+                            final reqName = req is Map ? (req['name'] ?? 'User') : 'User';
+                            final reqEmail = req is Map ? (req['email'] ?? '') : '';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: AppTheme.headerTeal.withOpacity(0.3),
+                                    child: Text(reqName[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(reqName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                        if (reqEmail.isNotEmpty)
+                                          Text(reqEmail, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      try {
+                                        await ApiService.approveRequest(widget.itemId, reqId);
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Request approved!')));
+                                          _loadItem();
+                                        }
+                                      } catch (e) {
+                                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))));
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text('Approve', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
           else if (_currentUserId != null && item['sellerId'] != _currentUserId)
             Container(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -396,12 +515,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     Expanded(
                       flex: 2,
                       child: ElevatedButton(
-                        onPressed: () async {
+                        onPressed: hasRequested ? null : () async {
                           try {
-                            await ApiService.buyItem(widget.itemId);
+                            await ApiService.requestItem(widget.itemId);
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item purchased successfully!')));
-                              _loadItem(); // Reload to show sold status
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Request sent successfully!')));
+                              _loadItem(); // Reload to show requested status
                             }
                           } catch (e) {
                             if (mounted) {
@@ -410,13 +529,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryPink,
+                          backgroundColor: hasRequested ? Colors.grey : AppTheme.primaryPink,
                           foregroundColor: Colors.white,
                           minimumSize: const Size(double.infinity, 56),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 0,
                         ),
-                        child: const Text('Buy Now', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                        child: Text(hasRequested ? 'Requested' : 'Request to Buy', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                       ),
                     ),
                   ],
@@ -441,6 +560,35 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           ],
         ),
         child: Icon(icon, size: 22, color: iconColor),
+      ),
+    );
+  }
+
+  void _confirmDelete() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Item'),
+        content: const Text('Are you sure you want to delete this item?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiService.deleteItem(widget.itemId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item deleted successfully')));
+                  Navigator.pop(context, true);
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

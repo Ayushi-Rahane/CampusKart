@@ -18,6 +18,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _items = [];
   bool _isLoading = true;
   String _selectedCategory = 'All';
+  String _searchQuery = '';
+  String _sortBy = 'Newest';
   int _unreadCount = 0;
   Timer? _pollingTimer;
   int _selectedIndex = 0;
@@ -90,15 +92,76 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showSortFilter() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Sort By', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  ListTile(
+                    title: const Text('Newest First'),
+                    trailing: _sortBy == 'Newest' ? const Icon(Icons.check, color: AppTheme.primaryPink) : null,
+                    onTap: () {
+                      setState(() => _sortBy = 'Newest');
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    title: const Text('Price: Low to High'),
+                    trailing: _sortBy == 'Price: Low to High' ? const Icon(Icons.check, color: AppTheme.primaryPink) : null,
+                    onTap: () {
+                      setState(() => _sortBy = 'Price: Low to High');
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    title: const Text('Price: High to Low'),
+                    trailing: _sortBy == 'Price: High to Low' ? const Icon(Icons.check, color: AppTheme.primaryPink) : null,
+                    onTap: () {
+                      setState(() => _sortBy = 'Price: High to Low');
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            );
+          }
+        );
+      }
+    );
+  }
+
   Widget _buildHomeBody() {
-    final filteredItems = _selectedCategory == 'All' 
-        ? _items 
+    var filteredItems = _selectedCategory == 'All' 
+        ? List.from(_items)
         : _selectedCategory == 'Others'
             ? _items.where((item) {
                 final cat = item['category'] ?? '';
                 return cat != 'Furniture' && cat != 'Electronics' && cat != 'Books';
               }).toList()
             : _items.where((item) => item['category'] == _selectedCategory).toList();
+
+    if (_searchQuery.isNotEmpty) {
+      filteredItems = filteredItems.where((item) {
+        final title = (item['title'] ?? '').toString().toLowerCase();
+        return title.contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    if (_sortBy == 'Price: Low to High') {
+      filteredItems.sort((a, b) => (a['price'] as num? ?? 0).compareTo(b['price'] as num? ?? 0));
+    } else if (_sortBy == 'Price: High to Low') {
+      filteredItems.sort((a, b) => (b['price'] as num? ?? 0).compareTo(a['price'] as num? ?? 0));
+    }
 
     return SafeArea(
       child: Column(
@@ -146,13 +209,43 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
+                  GestureDetector(
+                    onTap: () {
+                      if (_unreadCount > 0) {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const ConversationsScreen()));
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No new notifications')));
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(Icons.notifications_active, color: Colors.white, size: 20),
+                          if (_unreadCount > 0)
+                            Positioned(
+                              right: -4,
+                              top: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  _unreadCount > 9 ? '9+' : _unreadCount.toString(),
+                                  style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                    child: const Icon(Icons.notifications_active, color: Colors.white, size: 20),
                   ),
                 ],
               ),
@@ -172,16 +265,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: const Color(0xFFF3F4F6),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          SizedBox(width: 15),
-                          Icon(Icons.search, color: Colors.grey),
-                          SizedBox(width: 10),
+                          const SizedBox(width: 15),
+                          const Icon(Icons.search, color: Colors.grey),
+                          const SizedBox(width: 10),
                           Expanded(
-                            child: Text(
-                              'Search items...', 
-                              style: TextStyle(color: Colors.grey),
-                              overflow: TextOverflow.ellipsis,
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                hintText: 'Search items...',
+                                hintStyle: TextStyle(color: Colors.grey),
+                                border: InputBorder.none,
+                                isDense: true,
+                              ),
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchQuery = value;
+                                });
+                              },
                             ),
                           ),
                         ],
@@ -189,14 +290,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Container(
-                    height: 50,
-                    width: 50,
-                    decoration: BoxDecoration(
-                      color: AppTheme.headerTeal,
-                      borderRadius: BorderRadius.circular(12),
+                  GestureDetector(
+                    onTap: _showSortFilter,
+                    child: Container(
+                      height: 50,
+                      width: 50,
+                      decoration: BoxDecoration(
+                        color: AppTheme.headerTeal,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.tune, color: Color(0xFF2D3142)),
                     ),
-                    child: const Icon(Icons.tune, color: Color(0xFF2D3142)),
                   ),
                 ],
               ),
