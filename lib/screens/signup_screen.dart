@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_service.dart';
+import 'otp_verification_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -15,17 +16,49 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  bool _isValidCollegeEmail(String email) {
+    final normalized = email.trim().toLowerCase();
+    return RegExp(r'^[a-z]+\.[a-z]+@cumminscollege\.in$').hasMatch(normalized);
+  }
+
   void _handleSignup() async {
     if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
       return;
     }
 
+    if (!_isValidCollegeEmail(_emailController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Use your college email: firstname.lastname@cumminscollege.in'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
+    if (_passwordController.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Password must be at least 6 characters'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      final result = await ApiService.register(_nameController.text, _emailController.text, _passwordController.text);
-      await ApiService.saveUserInfo(result);
-      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      await ApiService.register(
+        _nameController.text,
+        _emailController.text.trim().toLowerCase(),
+        _passwordController.text,
+      );
+      if (mounted) {
+        // Navigate to OTP screen (NOT home)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OtpVerificationScreen(email: _emailController.text.trim().toLowerCase()),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -106,7 +139,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(
-                      hintText: 'College Email',
+                      hintText: 'firstname.lastname@cumminscollege.in',
                       prefixIcon: Icon(Icons.email_outlined, color: AppTheme.lightText, size: 20),
                     ),
                   ),
@@ -115,12 +148,35 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _passwordController,
                     obscureText: true,
                     decoration: const InputDecoration(
-                      hintText: 'Password',
+                      hintText: 'Password (min 6 characters)',
                       prefixIcon: Icon(Icons.lock_outline, color: AppTheme.lightText, size: 20),
                     ),
                   ),
+
+                  const SizedBox(height: 12),
+
+                  // Email format hint
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.headerTeal.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppTheme.headerTeal, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Only Cummins College emails are accepted',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleSignup,
                     child: _isLoading 

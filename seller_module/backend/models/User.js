@@ -7,6 +7,11 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   phone: { type: String, default: '' },
   address: { type: String, default: '' },
+  emailVerified: { type: Boolean, default: false },
+  otp: { type: String, default: null },
+  otpExpiry: { type: Date, default: null },
+  otpAttempts: { type: Number, default: 0 },
+  lastOtpSent: { type: Date, default: null },
   ratings: [{
     buyerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_service.dart';
+import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,23 +15,52 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  bool _isValidCollegeEmail(String email) {
+    final normalized = email.trim().toLowerCase();
+    return RegExp(r'^[a-z]+\.[a-z]+@cumminscollege\.in$').hasMatch(normalized);
+  }
+
   void _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter email and password')));
       return;
     }
 
+    if (!_isValidCollegeEmail(_emailController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Use your college email: firstname.lastname@cumminscollege.in'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      final result = await ApiService.login(_emailController.text, _passwordController.text);
+      final result = await ApiService.login(_emailController.text.trim().toLowerCase(), _passwordController.text);
       await ApiService.saveUserInfo(result);
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: Colors.red,
-        ));
+        final msg = e.toString().replaceAll('Exception: ', '');
+        if (msg.contains('not verified') || msg.contains('OTP')) {
+          // Trigger a new OTP and redirect to verification screen
+          try {
+            await ApiService.resendOtp(_emailController.text.trim().toLowerCase());
+          } catch (_) {}
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OtpVerificationScreen(email: _emailController.text.trim().toLowerCase()),
+              ),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red,
+          ));
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -90,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(
-                      hintText: 'College Email or Phone',
+                      hintText: 'firstname.lastname@cumminscollege.in',
                       prefixIcon: Icon(Icons.email_outlined, color: AppTheme.lightText, size: 20),
                     ),
                   ),

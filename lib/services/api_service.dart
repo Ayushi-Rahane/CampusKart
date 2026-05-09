@@ -43,12 +43,39 @@ class ApiService {
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
     );
     
+    // In the new flow, register returns 201 with a message (no token)
     if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Registration failed');
+    }
+  }
+
+  static Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/verify-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'otp': otp}),
+    );
+    
+    if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       await saveToken(data['token']);
       return data;
     } else {
-      throw Exception(jsonDecode(response.body)['message'] ?? 'Registration failed');
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Verification failed');
+    }
+  }
+
+  static Future<void> resendOtp(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/resend-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    
+    if (response.statusCode != 200) {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to resend OTP');
     }
   }
 
