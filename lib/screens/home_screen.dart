@@ -6,6 +6,7 @@ import 'item_detail_screen.dart';
 import 'wishlist_screen.dart';
 import 'conversations_screen.dart';
 import 'profile_screen.dart';
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   String _sortBy = 'Newest';
   int _unreadCount = 0;
+  int _notifCount = -1;
   Timer? _pollingTimer;
   int _selectedIndex = 0;
 
@@ -29,7 +31,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchItems();
     _fetchUnreadCount();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchUnreadCount());
+    _fetchNotifCount();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _fetchUnreadCount();
+      _fetchNotifCount();
+    });
   }
 
   @override
@@ -46,7 +52,13 @@ class _HomeScreenState extends State<HomeScreen> {
           // New message arrived!
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('🔔 You have a new message!'),
+              content: const Row(
+                children: [
+                  Icon(Icons.mark_chat_unread, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('You have a new message!')),
+                ],
+              ),
               backgroundColor: AppTheme.headerTeal,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -64,6 +76,37 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
         setState(() => _unreadCount = count);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchNotifCount() async {
+    try {
+      final count = await ApiService.getNotificationUnreadCount();
+      if (mounted && count != _notifCount) {
+        if (count > _notifCount && _notifCount > 0) {
+          // New notification!
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.notifications_active, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('An item you requested is now available!')),
+                ],
+              ),
+              backgroundColor: Colors.green[700],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              action: SnackBarAction(
+                label: 'View',
+                textColor: Colors.white,
+                onPressed: () => setState(() => _selectedIndex = 4), // 4 is Notifications tab
+              ),
+            ),
+          );
+        }
+        setState(() => _notifCount = count);
       }
     } catch (_) {}
   }
@@ -196,7 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 4),
                             const Flexible(
                               child: Text(
-                                'Block B, Campus', 
+                                'Cummins College Campus', 
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -211,11 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () {
-                      if (_unreadCount > 0) {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => const ConversationsScreen()));
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No new notifications')));
-                      }
+                      setState(() => _selectedIndex = 4); // Go to Notifications tab
                     },
                     child: Container(
                       padding: const EdgeInsets.all(10),
@@ -224,10 +263,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const Icon(Icons.notifications_active, color: Colors.white, size: 20),
-                          if (_unreadCount > 0)
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.notifications_active, color: Colors.white, size: 20),
+                        if (_unreadCount > 0 || _notifCount > 0)
                             Positioned(
                               right: -4,
                               top: -4,
@@ -379,8 +418,9 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildHomeBody(),
           const SizedBox(), // Index 1 is Add Item (pushed)
-          WishlistScreen(),
+          const WishlistScreen(),
           const ConversationsScreen(),
+          const NotificationsScreen(),
           const ProfileScreen(),
         ],
       ),
@@ -417,19 +457,32 @@ class _HomeScreenState extends State<HomeScreen> {
                     top: -4,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primaryPink,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        _unreadCount > 9 ? '9+' : _unreadCount.toString(),
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
+                      decoration: const BoxDecoration(color: AppTheme.primaryPink, shape: BoxShape.circle),
+                      child: Text(_unreadCount > 9 ? '9+' : _unreadCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ),
               ],
             ),
             label: 'Chat',
+          ),
+          BottomNavigationBarItem(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_none),
+                if (_notifCount > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                      child: Text(_notifCount > 9 ? '9+' : _notifCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
+            ),
+            label: 'Alerts',
           ),
           const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],

@@ -60,7 +60,16 @@ class _AddItemScreenState extends State<AddItemScreen> {
       if (kIsWeb) {
         // For web
         final bytes = await _imageFile!.readAsBytes();
-        request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: _imageFile!.name));
+        
+        String ext = _imageFile!.name.split('.').last.toLowerCase();
+        if (!['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)) ext = 'jpeg';
+        
+        request.files.add(http.MultipartFile.fromBytes(
+          'image', 
+          bytes, 
+          filename: _imageFile!.name.isNotEmpty ? _imageFile!.name : 'upload.$ext',
+          contentType: MediaType('image', ext),
+        ));
       } else {
         // For mobile
         request.files.add(await http.MultipartFile.fromPath('image', _imageFile!.path));
@@ -107,16 +116,16 @@ class _AddItemScreenState extends State<AddItemScreen> {
             // Header
             Container(
               width: double.infinity,
-              height: 120, // Reduced height since AppBar is there
               decoration: const BoxDecoration(
                 color: AppTheme.headerTeal,
                 borderRadius: BorderRadius.vertical(
                   bottom: Radius.circular(40),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(

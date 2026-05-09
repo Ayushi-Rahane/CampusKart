@@ -491,6 +491,129 @@ class ApiService {
       throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to approve request');
     }
   }
+
+  // ---- Request Wishlist APIs ----
+
+  static Future<Map<String, dynamic>> addRequestWishlist(String itemName, String category, String description) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/request-wishlist'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'itemName': itemName, 'category': category, 'description': description}),
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to add request');
+    }
+  }
+
+  static Future<List<dynamic>> getRequestWishlist() async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/request-wishlist'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to load requests');
+    }
+  }
+
+  static Future<void> removeRequestWishlist(String id) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/request-wishlist/$id'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to remove request');
+    }
+  }
+
+  // ---- Notification APIs ----
+
+  static Future<List<dynamic>> getNotifications() async {
+    final token = await getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to load notifications');
+    }
+  }
+
+  static Future<int> getNotificationUnreadCount() async {
+    final token = await getToken();
+    if (token == null) return 0;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/notifications/unread-count'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['count'] ?? 0;
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  static Future<void> markNotificationRead(String notificationId) async {
+    final token = await getToken();
+    if (token == null) return;
+
+    await http.patch(
+      Uri.parse('$baseUrl/notifications/$notificationId/read'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    final token = await getToken();
+    if (token == null) return;
+
+    await http.patch(
+      Uri.parse('$baseUrl/notifications/read-all'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+  }
 }
-
-

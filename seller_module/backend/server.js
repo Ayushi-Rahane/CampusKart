@@ -10,6 +10,8 @@ const authRoutes = require('./routes/authRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const userRoutes = require('./routes/userRoutes');
+const requestWishlistRoutes = require('./routes/requestWishlistRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const app = express();
 
 // Middleware
@@ -27,6 +29,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/request-wishlist', requestWishlistRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

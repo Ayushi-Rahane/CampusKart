@@ -4,10 +4,19 @@ const Item = require('../models/Item');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const { upload } = require('../config/cloudinary');
+const requestWishlistRoutes = require('./requestWishlistRoutes');
 
 // POST /api/items - Add new item
 router.post('/', protect, upload.single('image'), async (req, res) => {
   try {
+    console.log("POST /api/items - body:", req.body);
+    console.log("POST /api/items - file:", req.file);
+    
+    if (!req.file) {
+      console.log("POST /api/items - No file received or upload failed");
+      return res.status(400).json({ message: 'Image upload failed or no image provided. Ensure the file format is allowed.' });
+    }
+
     const { title, description, price, category } = req.body;
     const newItem = await Item.create({
       title,
@@ -17,8 +26,13 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
       imageUrl: req.file.path, // Cloudinary URL
       sellerId: req.sellerId
     });
+
+    // Check if this new item matches any buyer's request wishlist
+    await requestWishlistRoutes.matchNewItemAgainstRequests(newItem);
+
     res.status(201).json(newItem);
   } catch (error) {
+    console.error("Error in POST /api/items:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -73,7 +87,23 @@ router.put('/:id', protect, async (req, res) => {
 // DELETE /api/items/:id
 router.delete('/:id', protect, async (req, res) => {
   try {
-    await Item.findOneAndDelete({ _id: req.params.id, sellerId: req.sellerId });
+    const item = await Item.findOneAndDelete({ _id: req.params.id, sellerId: req.sellerId });
+    if (item) {
+      // Clean up all references to this deleted item
+      const RequestWishlist = require('../models/RequestWishlist');
+      const Wishlist = require('../models/Wishlist');
+      const Notification = require('../models/Notification');
+
+      // Unmatch any request wishlists that were tied to this item
+      await RequestWishlist.updateMany(
+        { matchedItemId: req.params.id },
+        { matched: false, matchedItemId: null }
+      );
+      // Remove saved wishlist entries for this item
+      await Wishlist.deleteMany({ itemId: req.params.id });
+      // Remove notifications pointing to this item
+      await Notification.deleteMany({ itemId: req.params.id });
+    }
     res.json({ message: 'Item removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
